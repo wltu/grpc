@@ -46,8 +46,6 @@
 #include <algorithm>
 #include <unordered_map>
 
-#include "absl/strings/str_cat.h"  // IWYU pragma: keep
-
 #include <grpc/slice.h>
 #include <grpc/support/alloc.h>
 #include <grpc/support/log.h>
