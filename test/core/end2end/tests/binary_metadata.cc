@@ -16,16 +16,15 @@
 //
 //
 
-#include <memory>
-
-#include "gtest/gtest.h"
-
 #include <grpc/impl/channel_arg_names.h>
 #include <grpc/status.h>
 
+#include <memory>
+
+#include "gtest/gtest.h"
 #include "src/core/lib/channel/channel_args.h"
-#include "src/core/lib/gprpp/time.h"
 #include "src/core/lib/slice/slice.h"
+#include "src/core/util/time.h"
 #include "test/core/end2end/end2end_tests.h"
 
 namespace grpc_core {
@@ -48,9 +47,9 @@ static void BinaryMetadata(CoreEnd2endTest& test, bool server_true_binary,
   auto status_string = RandomBinarySlice(256);
 
   auto c = test.NewClientCall("/foo").Timeout(Duration::Minutes(1)).Create();
-  CoreEnd2endTest::IncomingMetadata server_initial_md;
-  CoreEnd2endTest::IncomingMessage server_message;
-  CoreEnd2endTest::IncomingStatusOnClient server_status;
+  IncomingMetadata server_initial_md;
+  IncomingMessage server_message;
+  IncomingStatusOnClient server_status;
   c.NewBatch(1)
       .SendInitialMetadata({
           {"key1-bin", key1_payload.as_string_view()},
@@ -64,7 +63,7 @@ static void BinaryMetadata(CoreEnd2endTest& test, bool server_true_binary,
   auto s = test.RequestCall(101);
   test.Expect(101, true);
   test.Step();
-  CoreEnd2endTest::IncomingMessage client_message;
+  IncomingMessage client_message;
   s.NewBatch(102)
       .SendInitialMetadata({
           {"key3-bin", key3_payload.as_string_view()},
@@ -73,11 +72,12 @@ static void BinaryMetadata(CoreEnd2endTest& test, bool server_true_binary,
       .RecvMessage(client_message);
   test.Expect(102, true);
   test.Step();
-  CoreEnd2endTest::IncomingCloseOnServer client_close;
+  IncomingCloseOnServer client_close;
   s.NewBatch(103)
       .RecvCloseOnServer(client_close)
       .SendMessage(response_payload.Ref())
-      .SendStatusFromServer(GRPC_STATUS_OK, status_string.as_string_view(),
+      .SendStatusFromServer(GRPC_STATUS_INVALID_ARGUMENT,
+                            status_string.as_string_view(),
                             {
                                 {"key5-bin", key5_payload.as_string_view()},
                                 {"key6-bin", key6_payload.as_string_view()},
@@ -86,7 +86,7 @@ static void BinaryMetadata(CoreEnd2endTest& test, bool server_true_binary,
   test.Expect(1, true);
   test.Step();
 
-  EXPECT_EQ(server_status.status(), GRPC_STATUS_OK);
+  EXPECT_EQ(server_status.status(), GRPC_STATUS_INVALID_ARGUMENT);
   EXPECT_EQ(server_status.message(), status_string.as_string_view());
   EXPECT_EQ(s.method(), "/foo");
   EXPECT_FALSE(client_close.was_cancelled());
@@ -102,25 +102,23 @@ static void BinaryMetadata(CoreEnd2endTest& test, bool server_true_binary,
             key6_payload.as_string_view());
 }
 
-CORE_END2END_TEST(CoreEnd2endTest,
+CORE_END2END_TEST(CoreEnd2endTests,
                   BinaryMetadataServerTrueBinaryClientHttp2Fallback) {
   BinaryMetadata(*this, true, false);
 }
 
-CORE_END2END_TEST(CoreEnd2endTest,
+CORE_END2END_TEST(CoreEnd2endTests,
                   BinaryMetadataServerHttp2FallbackClientTrueBinary) {
   BinaryMetadata(*this, false, true);
 }
 
-CORE_END2END_TEST(CoreEnd2endTest,
+CORE_END2END_TEST(CoreEnd2endTests,
                   BinaryMetadataServerTrueBinaryClientTrueBinary) {
   BinaryMetadata(*this, true, true);
 }
 
-CORE_END2END_TEST(CoreEnd2endTest,
+CORE_END2END_TEST(CoreEnd2endTests,
                   BinaryMetadataServerHttp2FallbackClientHttp2Fallback) {
-  // TODO(vigneshbabu): re-enable these before release
-  SKIP_IF_USES_EVENT_ENGINE_CLIENT();
   BinaryMetadata(*this, false, false);
 }
 

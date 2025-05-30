@@ -17,6 +17,7 @@
 #include <map>
 
 #include "absl/algorithm/container.h"
+#include "absl/log/check.h"
 #include "absl/strings/ascii.h"
 
 namespace grpc {
@@ -49,6 +50,19 @@ std::unordered_set<std::string> ToLowerCase(
     result.emplace(absl::AsciiStrToLower(str));
   }
   return result;
+}
+
+bool HasNonEmptyMetadata(
+    const std::map<std::string, LoadBalancerStatsResponse::MetadataByPeer>&
+        metadata_by_peer) {
+  for (const auto& entry : metadata_by_peer) {
+    for (const auto& rpc_metadata : entry.second.rpc_metadata()) {
+      if (rpc_metadata.metadata_size() > 0) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 }  // namespace
@@ -113,8 +127,12 @@ LoadBalancerStatsResponse XdsStatsWatcher::WaitForRpcStatsResponse(
                [this] { return rpcs_needed_ == 0; });
   response.mutable_rpcs_by_peer()->insert(rpcs_by_peer_.begin(),
                                           rpcs_by_peer_.end());
-  response.mutable_metadatas_by_peer()->insert(metadata_by_peer_.begin(),
-                                               metadata_by_peer_.end());
+  // Return metadata if at least one RPC had relevant metadata. Note that empty
+  // entries would be returned for RCPs with no relevant metadata in this case.
+  if (HasNonEmptyMetadata(metadata_by_peer_)) {
+    response.mutable_metadatas_by_peer()->insert(metadata_by_peer_.begin(),
+                                                 metadata_by_peer_.end());
+  }
   auto& response_rpcs_by_method = *response.mutable_rpcs_by_method();
   for (const auto& rpc_by_type : rpcs_by_type_) {
     std::string method_name;
@@ -123,7 +141,7 @@ LoadBalancerStatsResponse XdsStatsWatcher::WaitForRpcStatsResponse(
     } else if (rpc_by_type.first == ClientConfigureRequest::UNARY_CALL) {
       method_name = "UnaryCall";
     } else {
-      GPR_ASSERT(0);
+      CHECK(0);
     }
     // TODO(@donnadionne): When the test runner changes to accept EMPTY_CALL
     // and UNARY_CALL we will just use the name of the enum instead of the

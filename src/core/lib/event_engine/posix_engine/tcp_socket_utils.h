@@ -15,24 +15,23 @@
 #ifndef GRPC_SRC_CORE_LIB_EVENT_ENGINE_POSIX_ENGINE_TCP_SOCKET_UTILS_H
 #define GRPC_SRC_CORE_LIB_EVENT_ENGINE_POSIX_ENGINE_TCP_SOCKET_UTILS_H
 
+#include <grpc/event_engine/endpoint_config.h>
+#include <grpc/event_engine/event_engine.h>
+#include <grpc/event_engine/memory_allocator.h>
+#include <grpc/grpc.h>
 #include <grpc/support/port_platform.h>
 
 #include <functional>
 #include <string>
 #include <utility>
 
+#include "absl/log/check.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-
-#include <grpc/event_engine/endpoint_config.h>
-#include <grpc/event_engine/event_engine.h>
-#include <grpc/grpc.h>
-#include <grpc/support/log.h>
-
-#include "src/core/lib/gprpp/ref_counted_ptr.h"
 #include "src/core/lib/iomgr/port.h"
 #include "src/core/lib/iomgr/socket_mutator.h"
 #include "src/core/lib/resource_quota/resource_quota.h"
+#include "src/core/util/ref_counted_ptr.h"
 
 #ifdef GRPC_POSIX_SOCKET_UTILS_COMMON
 #include <sys/socket.h>
@@ -47,8 +46,7 @@
 #endif
 #endif  // ifdef GRPC_LINUX_ERRQUEUE
 
-namespace grpc_event_engine {
-namespace experimental {
+namespace grpc_event_engine::experimental {
 
 struct PosixTcpOptions {
   static constexpr int kDefaultReadChunkSize = 8192;
@@ -75,6 +73,8 @@ struct PosixTcpOptions {
   int dscp = kDscpNotSet;
   grpc_core::RefCountedPtr<grpc_core::ResourceQuota> resource_quota;
   struct grpc_socket_mutator* socket_mutator = nullptr;
+  grpc_event_engine::experimental::MemoryAllocatorFactory*
+      memory_allocator_factory = nullptr;
   PosixTcpOptions() = default;
   // Move ctor
   PosixTcpOptions(PosixTcpOptions&& other) noexcept {
@@ -89,6 +89,8 @@ struct PosixTcpOptions {
     }
     socket_mutator = std::exchange(other.socket_mutator, nullptr);
     resource_quota = std::move(other.resource_quota);
+    memory_allocator_factory =
+        std::exchange(other.memory_allocator_factory, nullptr);
     CopyIntegerOptions(other);
     return *this;
   }
@@ -98,6 +100,7 @@ struct PosixTcpOptions {
       socket_mutator = grpc_socket_mutator_ref(other.socket_mutator);
     }
     resource_quota = other.resource_quota;
+    memory_allocator_factory = other.memory_allocator_factory;
     CopyIntegerOptions(other);
   }
   // Copy assignment
@@ -113,6 +116,7 @@ struct PosixTcpOptions {
       socket_mutator = grpc_socket_mutator_ref(other.socket_mutator);
     }
     resource_quota = other.resource_quota;
+    memory_allocator_factory = other.memory_allocator_factory;
     CopyIntegerOptions(other);
     return *this;
   }
@@ -155,9 +159,9 @@ void UnlinkIfUnixDomainSocket(
 
 class PosixSocketWrapper {
  public:
-  explicit PosixSocketWrapper(int fd) : fd_(fd) { GPR_ASSERT(fd_ > 0); }
+  explicit PosixSocketWrapper(int fd) : fd_(fd) { CHECK_GT(fd_, 0); }
 
-  PosixSocketWrapper() : fd_(-1){};
+  PosixSocketWrapper() : fd_(-1) {};
 
   ~PosixSocketWrapper() = default;
 
@@ -316,7 +320,8 @@ struct PosixSocketWrapper::PosixSocketCreateResult {
   EventEngine::ResolvedAddress mapped_target_addr;
 };
 
-}  // namespace experimental
-}  // namespace grpc_event_engine
+bool SetSocketDualStack(int fd);
+
+}  // namespace grpc_event_engine::experimental
 
 #endif  // GRPC_SRC_CORE_LIB_EVENT_ENGINE_POSIX_ENGINE_TCP_SOCKET_UTILS_H

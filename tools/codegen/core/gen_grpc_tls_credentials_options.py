@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Generator script for src/core/lib/security/credentials/tls/grpc_tls_credentials_options.h and test/core/security/grpc_tls_credentials_options_comparator_test.cc
+# Generator script for src/core/credentials/transport/tls/grpc_tls_credentials_options.h and test/core/credentials/transport/tls/grpc_tls_credentials_options_comparator_test.cc
 # Should be executed from grpc's root directory.
 
 from __future__ import print_function
@@ -101,7 +101,7 @@ _DATA_MEMBERS = [
         ),
         test_name="DifferentCertificateVerifier",
         test_value_1="MakeRefCounted<HostNameCertificateVerifier>()",
-        test_value_2='MakeRefCounted<XdsCertificateVerifier>(nullptr, "")',
+        test_value_2="MakeRefCounted<XdsCertificateVerifier>(nullptr)",
     ),
     DataMember(
         name="check_call_host",
@@ -284,9 +284,9 @@ if len(sys.argv) > 1 and sys.argv[1] == "--test":
     test_mode = True
 
 HEADER_FILE_NAME = (
-    "src/core/lib/security/credentials/tls/grpc_tls_credentials_options.h"
+    "src/core/credentials/transport/tls/grpc_tls_credentials_options.h"
 )
-# Generate src/core/lib/security/credentials/tls/grpc_tls_credentials_options.h
+# Generate src/core/credentials/transport/tls/grpc_tls_credentials_options.h
 header_file_name = HEADER_FILE_NAME
 if test_mode:
     header_file_name = tempfile.NamedTemporaryFile(delete=False).name
@@ -298,20 +298,21 @@ print(
     file=H,
 )
 print(
-    """#ifndef GRPC_SRC_CORE_LIB_SECURITY_CREDENTIALS_TLS_GRPC_TLS_CREDENTIALS_OPTIONS_H
-#define GRPC_SRC_CORE_LIB_SECURITY_CREDENTIALS_TLS_GRPC_TLS_CREDENTIALS_OPTIONS_H
+    """#ifndef GRPC_SRC_CORE_CREDENTIALS_TRANSPORT_TLS_GRPC_TLS_CREDENTIALS_OPTIONS_H
+#define GRPC_SRC_CORE_CREDENTIALS_TRANSPORT_TLS_GRPC_TLS_CREDENTIALS_OPTIONS_H
 
 #include <grpc/support/port_platform.h>
 
 #include "absl/container/inlined_vector.h"
 
+#include <grpc/credentials.h>
 #include <grpc/grpc_security.h>
 
-#include "src/core/lib/gprpp/ref_counted.h"
-#include "src/core/lib/security/credentials/tls/grpc_tls_certificate_distributor.h"
-#include "src/core/lib/security/credentials/tls/grpc_tls_certificate_provider.h"
-#include "src/core/lib/security/credentials/tls/grpc_tls_certificate_verifier.h"
-#include "src/core/lib/security/security_connector/ssl_utils.h"
+#include "src/core/util/ref_counted.h"
+#include "src/core/credentials/transport/tls/grpc_tls_certificate_distributor.h"
+#include "src/core/credentials/transport/tls/grpc_tls_certificate_provider.h"
+#include "src/core/credentials/transport/tls/grpc_tls_certificate_verifier.h"
+#include "src/core/credentials/transport/tls/ssl_utils.h"
 
 // Contains configurable options specified by callers to configure their certain
 // security features supported in TLS.
@@ -319,6 +320,7 @@ print(
 struct grpc_tls_credentials_options
     : public grpc_core::RefCounted<grpc_tls_credentials_options> {
  public:
+  grpc_tls_credentials_options() = default;
   ~grpc_tls_credentials_options() override = default;
 """,
     file=H,
@@ -394,6 +396,25 @@ for i in range(len(_DATA_MEMBERS)):
         operator_equal_content += " &&\n"
 print(operator_equal_content + ";\n  }", file=H)
 
+# Write out copy constructor
+print(
+    "\n  grpc_tls_credentials_options(grpc_tls_credentials_options& other) :",
+    file=H,
+)
+operator_equal_content = "      "
+for i in range(len(_DATA_MEMBERS)):
+    if i != 0:
+        operator_equal_content += "      "
+    if i == len(_DATA_MEMBERS) - 1:
+        operator_equal_content += (
+            _DATA_MEMBERS[i].name + "_(other." + _DATA_MEMBERS[i].name + "_)"
+        )
+    else:
+        operator_equal_content += (
+            _DATA_MEMBERS[i].name + "_(other." + _DATA_MEMBERS[i].name + "_),\n"
+        )
+print(operator_equal_content + "  {}", file=H)
+
 # Print out data member declarations
 print("\n private:", file=H)
 for data_member in _DATA_MEMBERS:
@@ -421,16 +442,14 @@ for data_member in _DATA_MEMBERS:
 print(
     """};
 
-#endif  // GRPC_SRC_CORE_LIB_SECURITY_CREDENTIALS_TLS_GRPC_TLS_CREDENTIALS_OPTIONS_H""",
+#endif  // GRPC_SRC_CORE_CREDENTIALS_TRANSPORT_TLS_GRPC_TLS_CREDENTIALS_OPTIONS_H""",
     file=H,
 )
 
 H.close()
 
-# Generate test/core/security/grpc_tls_credentials_options_comparator_test.cc
-TEST_FILE_NAME = (
-    "test/core/security/grpc_tls_credentials_options_comparator_test.cc"
-)
+# Generate test/core/credentials/transport/tls/grpc_tls_credentials_options_comparator_test.cc
+TEST_FILE_NAME = "test/core/credentials/transport/tls/grpc_tls_credentials_options_comparator_test.cc"
 test_file_name = TEST_FILE_NAME
 if test_mode:
     test_file_name = tempfile.NamedTemporaryFile(delete=False).name
@@ -447,11 +466,12 @@ print(
 
 #include <string>
 
-#include <gmock/gmock.h>
+#include <grpc/credentials.h>
 
-#include "src/core/lib/security/credentials/xds/xds_credentials.h"
-#include "src/core/lib/security/credentials/tls/grpc_tls_credentials_options.h"
-#include "test/core/util/test_config.h"
+#include "gmock/gmock.h"
+#include "src/core/credentials/transport/xds/xds_credentials.h"
+#include "src/core/credentials/transport/tls/grpc_tls_credentials_options.h"
+#include "test/core/test_util/test_config.h"
 
 namespace grpc_core {
 namespace {

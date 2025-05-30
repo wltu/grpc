@@ -17,7 +17,7 @@ set -eo pipefail
 
 # Constants
 readonly GITHUB_REPOSITORY_NAME="grpc"
-readonly TEST_DRIVER_INSTALL_SCRIPT_URL="https://raw.githubusercontent.com/${TEST_DRIVER_REPO_OWNER:-grpc}/grpc/${TEST_DRIVER_BRANCH:-master}/tools/internal_ci/linux/grpc_xds_k8s_install_test_driver.sh"
+readonly TEST_DRIVER_INSTALL_SCRIPT_URL="https://raw.githubusercontent.com/${TEST_DRIVER_REPO_OWNER:-grpc}/psm-interop/${TEST_DRIVER_BRANCH:-main}/.kokoro/psm_interop_kokoro_lib.sh"
 # Keep orphaned resources last 2 days.
 readonly KEEP_HOURS="${KEEP_HOURS:-48}"
 
@@ -39,6 +39,13 @@ cleanup::activate_secondary_cluster_as_primary() {
 
 cleanup::job::cleanup_td() {
   cleanup::run_clean "$1" --mode=td
+}
+
+cleanup::job::cleanup_td_dualstack() {
+  cleanup::run_clean "$1" \
+    --mode=td_no_legacy \
+    --td_resource_prefixes='psm-ds' \
+    --flagfile=config/common-dualstack.cfg
 }
 
 #######################################
@@ -75,6 +82,26 @@ cleanup::job::cleanup_cluster_url_map() {
 cleanup::job::cleanup_cluster_security() {
   cleanup::activate_cluster GKE_CLUSTER_PSM_SECURITY
   cleanup::run_clean "$1" --mode=k8s
+}
+
+#######################################
+# The Gateway cluster is used by the gamma test suites.
+#######################################
+cleanup::job::cleanup_cluster_gamma() {
+  cleanup::activate_cluster GKE_CLUSTER_PSM_CSM
+  cleanup::run_clean "$1" --mode=k8s
+}
+
+#######################################
+# The Dualstack cluster is used by the dualstack test suites.
+#######################################
+cleanup::job::cleanup_cluster_dualstack() {
+  cleanup::activate_cluster GKE_CLUSTER_DUALSTACK
+  cleanup::run_clean "$1" \
+    --mode=k8s \
+    --server_prefixes='psm-ds' \
+    --client_prefixes='psm-ds' \
+    --flagfile=config/common-dualstack.cfg
 }
 
 #######################################
@@ -127,10 +154,13 @@ main() {
   declare -a cleanup_jobs
   cleanup_jobs=(
     "cleanup_td"
+    "cleanup_td_dualstack"
     "cleanup_cluster_lb_primary"
     "cleanup_cluster_lb_secondary"
     "cleanup_cluster_security"
     "cleanup_cluster_url_map"
+    "cleanup_cluster_gamma"
+    "cleanup_cluster_dualstack"
   )
   for job_name in "${cleanup_jobs[@]}"; do
     echo "-------------------- Starting job ${job_name} --------------------"

@@ -19,11 +19,13 @@
 
 #include <utility>
 
+#include "src/core/util/json/json.h"
+
 namespace grpc_core {
 
-namespace promise_detail {
-
-// Implementation type for Race combinator.
+/// Run all the promises, return the first result that's available.
+/// If two results are simultaneously available, bias towards the first result
+/// listed.
 template <typename... Promises>
 class Race;
 
@@ -32,10 +34,11 @@ class Race<Promise, Promises...> {
  public:
   using Result = decltype(std::declval<Promise>()());
 
-  explicit Race(Promise promise, Promises... promises)
+  GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION explicit Race(Promise promise,
+                                                     Promises... promises)
       : promise_(std::move(promise)), next_(std::move(promises)...) {}
 
-  Result operator()() {
+  GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION Result operator()() {
     // Check our own promise.
     auto r = promise_();
     if (r.pending()) {
@@ -44,6 +47,19 @@ class Race<Promise, Promises...> {
     }
     // Return the first ready result.
     return std::move(r.value());
+  }
+
+  Json ToJson() const {
+    Json::Object obj;
+    Json::Array array;
+    AddJson(array);
+    obj["race"] = Json::FromArray(std::move(array));
+    return Json::FromObject(std::move(obj));
+  }
+
+  void AddJson(Json::Array& array) const {
+    array.emplace_back(PromiseAsJson(promise_));
+    next_.AddJson(array);
   }
 
  private:
@@ -57,22 +73,24 @@ template <typename Promise>
 class Race<Promise> {
  public:
   using Result = decltype(std::declval<Promise>()());
-  explicit Race(Promise promise) : promise_(std::move(promise)) {}
-  Result operator()() { return promise_(); }
+  GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION explicit Race(Promise promise)
+      : promise_(std::move(promise)) {}
+  GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION Result operator()() {
+    return promise_();
+  }
+
+  Json ToJson() const { return PromiseAsJson(promise_); }
+
+  void AddJson(Json::Array& array) const {
+    array.emplace_back(PromiseAsJson(promise_));
+  }
 
  private:
   Promise promise_;
 };
 
-}  // namespace promise_detail
-
-/// Run all the promises, return the first result that's available.
-/// If two results are simultaneously available, bias towards the first result
-/// listed.
 template <typename... Promises>
-promise_detail::Race<Promises...> Race(Promises... promises) {
-  return promise_detail::Race<Promises...>(std::move(promises)...);
-}
+Race(Promises...) -> Race<Promises...>;
 
 }  // namespace grpc_core
 

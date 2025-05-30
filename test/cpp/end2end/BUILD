@@ -28,11 +28,12 @@ grpc_cc_library(
     hdrs = ["test_service_impl.h"],
     external_deps = [
         "gtest",
+        "absl/log:check",
         "absl/synchronization",
     ],
     deps = [
-        "//src/proto/grpc/testing:echo_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -45,13 +46,12 @@ grpc_cc_library(
     deps = [
         "//:grpc",
         "//:grpc++",
-        "//src/proto/grpc/health/v1:health_proto",
+        "//src/proto/grpc/health/v1:health_cc_grpc",
     ],
 )
 
 grpc_cc_library(
     name = "counted_service",
-    testonly = True,
     hdrs = ["counted_service.h"],
     deps = [
         "//:grpc",
@@ -63,6 +63,9 @@ grpc_cc_library(
     testonly = True,
     srcs = ["connection_attempt_injector.cc"],
     hdrs = ["connection_attempt_injector.h"],
+    external_deps = [
+        "absl/log:check",
+    ],
     deps = [
         "//:grpc",
     ],
@@ -74,10 +77,11 @@ grpc_cc_library(
     srcs = ["interceptors_util.cc"],
     hdrs = ["interceptors_util.h"],
     external_deps = [
+        "absl/log:check",
         "gtest",
     ],
     deps = [
-        "//src/proto/grpc/testing:echo_proto",
+        "//src/proto/grpc/testing:echo_cc_grpc",
         "//test/cpp/util:test_util",
     ],
 )
@@ -92,8 +96,8 @@ grpc_cc_library(
     ],
     deps = [
         ":counted_service",
-        "//src/proto/grpc/lookup/v1:rls_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/lookup/v1:rls_cc_grpc",
+        "//test/core/test_util:grpc_test_util",
     ],
 )
 
@@ -101,22 +105,24 @@ grpc_cc_test(
     name = "async_end2end_test",
     srcs = ["async_end2end_test.cc"],
     external_deps = [
+        "absl/log:check",
         "gtest",
     ],
     shard_count = 10,
     tags = [
         "cpp_end2end_test",
         "no_test_ios",
+        "thready_tsan",
     ],
     deps = [
         "//:gpr",
         "//:grpc",
         "//:grpc++",
-        "//src/proto/grpc/health/v1:health_proto",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//src/proto/grpc/testing/duplicate:echo_duplicate_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/health/v1:health_cc_grpc",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//src/proto/grpc/testing/duplicate:echo_duplicate_cc_grpc",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -128,6 +134,7 @@ grpc_cc_test(
         ":client_crash_test_server",
     ],
     external_deps = [
+        "absl/log:check",
         "gtest",
     ],
     tags = [
@@ -141,9 +148,9 @@ grpc_cc_test(
         "//:gpr",
         "//:grpc",
         "//:grpc++",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -155,9 +162,11 @@ grpc_cc_test(
         ":client_crash_test_server",
     ],
     external_deps = [
+        "absl/log:check",
         "gtest",
     ],
     tags = [
+        "grpc:fails-internally",
         "no_test_android",  # android_cc_test doesn't work with data dependency.
         "no_test_ios",
         "no_windows",
@@ -166,10 +175,10 @@ grpc_cc_test(
         "//:gpr",
         "//:grpc",
         "//:grpc++",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//src/proto/grpc/testing/duplicate:echo_duplicate_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//src/proto/grpc/testing/duplicate:echo_duplicate_cc_grpc",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -187,12 +196,36 @@ grpc_cc_binary(
         "//:gpr",
         "//:grpc",
         "//:grpc++",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//src/proto/grpc/testing/duplicate:echo_duplicate_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//src/proto/grpc/testing/duplicate:echo_duplicate_cc_grpc",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_config",
         "//test/cpp/util:test_util",
+    ],
+)
+
+grpc_cc_test(
+    name = "client_fork_test",
+    srcs = ["client_fork_test.cc"],
+    external_deps = [
+        "absl/strings",
+        "gtest",
+    ],
+    tags = [
+        "fork_test",
+        "no_test_ios",
+        "no_windows",
+    ],
+    deps = [
+        "//:gpr",
+        "//:grpc",
+        "//:grpc++",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//src/proto/grpc/testing/duplicate:echo_duplicate_cc_grpc",
+        "//test/core/test_util:grpc_test_util",
+        "//test/cpp/util:test_config",
     ],
 )
 
@@ -200,6 +233,7 @@ grpc_cc_test(
     name = "client_callback_end2end_test",
     srcs = ["client_callback_end2end_test.cc"],
     external_deps = [
+        "absl/log:check",
         "gtest",
     ],
     tags = ["cpp_end2end_test"],
@@ -209,10 +243,10 @@ grpc_cc_test(
         "//:gpr",
         "//:grpc",
         "//:grpc++",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//src/proto/grpc/testing:simple_messages_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//src/proto/grpc/testing:simple_messages_cc_proto",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -229,9 +263,9 @@ grpc_cc_test(
         "//:gpr",
         "//:grpc",
         "//:grpc++",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -240,6 +274,7 @@ grpc_cc_test(
     name = "client_interceptors_end2end_test",
     srcs = ["client_interceptors_end2end_test.cc"],
     external_deps = [
+        "absl/log:check",
         "gtest",
     ],
     tags = ["cpp_end2end_test"],
@@ -249,9 +284,9 @@ grpc_cc_test(
         "//:gpr",
         "//:grpc",
         "//:grpc++",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -261,6 +296,7 @@ grpc_cc_library(
     testonly = True,
     srcs = ["end2end_test.cc"],
     external_deps = [
+        "absl/log:check",
         "gtest",
     ],
     linkstatic = True,
@@ -271,10 +307,10 @@ grpc_cc_library(
         "//:grpc",
         "//:grpc++",
         "//:grpc++_test",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//src/proto/grpc/testing/duplicate:echo_duplicate_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//src/proto/grpc/testing/duplicate:echo_duplicate_cc_grpc",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
     alwayslink = 1,
@@ -291,12 +327,15 @@ grpc_cc_test(
         "//src/core/tsi/test_creds:server1.pem",
     ],
     external_deps = [
+        "absl/log:check",
         "gtest",
     ],
     # TODO(yulin-liang): The test is not able to load the certificate files on
     # iOS. Figure out why.
     tags = [
         "cpp_end2end_test",
+        # b/117517566.
+        "grpc:no-internal-poller",
         "no_test_ios",
     ],
     deps = [
@@ -307,9 +346,10 @@ grpc_cc_test(
         "//:grpcpp_channelz",
         "//src/core:slice",
         "//src/proto/grpc/channelz:channelz_proto",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//test/core/event_engine:event_engine_test_utils",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -325,9 +365,9 @@ grpc_cc_test(
         "//:gpr",
         "//:grpc",
         "//:grpc++",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -336,11 +376,10 @@ grpc_cc_test(
     name = "end2end_test",
     size = "large",
     flaky = True,  # TODO(b/151704375)
-    shard_count = 10,
+    shard_count = 30,
     tags = [
         "cpp_end2end_test",
         "no_test_ios",
-        "surface_registered_method_lookup",
     ],
     deps = [
         ":end2end_test_lib",
@@ -360,9 +399,9 @@ grpc_cc_test(
         "//:gpr",
         "//:grpc",
         "//:grpc++",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -378,10 +417,10 @@ grpc_cc_test(
         "//:gpr",
         "//:grpc",
         "//:grpc++",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//src/proto/grpc/testing/duplicate:echo_duplicate_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//src/proto/grpc/testing/duplicate:echo_duplicate_cc_grpc",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -392,18 +431,24 @@ grpc_cc_test(
     external_deps = [
         "gtest",
     ],
-    tags = ["cpp_end2end_test"],
+    tags = [
+        "cpp_end2end_test",
+        # Will fail as sync health check service is enabled by default internally, which is however
+        # disabled in OSS:
+        # b/117623310.
+        "grpc:no-internal-poller",
+    ],
     deps = [
         ":test_health_check_service_impl",
         ":test_service_impl",
         "//:gpr",
         "//:grpc",
         "//:grpc++",
-        "//src/proto/grpc/health/v1:health_proto",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//src/proto/grpc/testing/duplicate:echo_duplicate_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/health/v1:health_cc_grpc",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//src/proto/grpc/testing/duplicate:echo_duplicate_cc_grpc",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -412,6 +457,7 @@ grpc_cc_test(
     name = "hybrid_end2end_test",
     srcs = ["hybrid_end2end_test.cc"],
     external_deps = [
+        "absl/log:check",
         "gtest",
     ],
     tags = ["cpp_end2end_test"],
@@ -420,10 +466,10 @@ grpc_cc_test(
         "//:gpr",
         "//:grpc",
         "//:grpc++",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//src/proto/grpc/testing/duplicate:echo_duplicate_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//src/proto/grpc/testing/duplicate:echo_duplicate_cc_grpc",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -432,6 +478,7 @@ grpc_cc_test(
     name = "raw_end2end_test",
     srcs = ["raw_end2end_test.cc"],
     external_deps = [
+        "absl/log:check",
         "gtest",
     ],
     tags = ["cpp_end2end_test"],
@@ -440,10 +487,10 @@ grpc_cc_test(
         "//:gpr",
         "//:grpc",
         "//:grpc++",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//src/proto/grpc/testing/duplicate:echo_duplicate_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//src/proto/grpc/testing/duplicate:echo_duplicate_cc_grpc",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -460,10 +507,10 @@ grpc_cc_test(
         "//:grpc",
         "//:grpc++",
         "//:grpc++_test",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//src/proto/grpc/testing/duplicate:echo_duplicate_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//src/proto/grpc/testing/duplicate:echo_duplicate_cc_grpc",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -472,6 +519,7 @@ grpc_cc_test(
     name = "nonblocking_test",
     srcs = ["nonblocking_test.cc"],
     external_deps = [
+        "absl/log:check",
         "gtest",
     ],
     tags = ["cpp_end2end_test"],
@@ -479,9 +527,9 @@ grpc_cc_test(
         "//:gpr",
         "//:grpc",
         "//:grpc++",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -490,12 +538,16 @@ grpc_cc_test(
     name = "client_lb_end2end_test",
     srcs = ["client_lb_end2end_test.cc"],
     external_deps = [
+        "absl/log:check",
+        "absl/log:log",
         "gtest",
     ],
     flaky = True,  # TODO(b/151315347)
     tags = [
         "cpp_end2end_test",
         "cpp_lb_end2end_test",
+        # b/117575949.
+        "grpc:no-internal-poller",
         "no_windows",
     ],  # TODO(jtattermusch): fix test on windows
     deps = [
@@ -508,14 +560,16 @@ grpc_cc_test(
         "//:grpcpp_call_metric_recorder",
         "//:grpcpp_orca_service",
         "//src/core:channel_args",
-        "//src/proto/grpc/health/v1:health_proto",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//src/proto/grpc/testing/duplicate:echo_duplicate_proto",
-        "//src/proto/grpc/testing/xds/v3:orca_load_report_proto",
-        "//test/core/util:grpc_test_util",
-        "//test/core/util:test_lb_policies",
+        "//src/core:config_selector",
+        "//src/proto/grpc/health/v1:health_cc_grpc",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//src/proto/grpc/testing/duplicate:echo_duplicate_cc_grpc",
+        "//test/core/test_util:grpc_test_util",
+        "//test/core/test_util:postmortem",
+        "//test/core/test_util:test_lb_policies",
         "//test/cpp/util:test_util",
+        "@com_github_cncf_xds//xds/data/orca/v3:pkg_cc_proto",
     ],
 )
 
@@ -523,8 +577,8 @@ grpc_cc_test(
     name = "rls_end2end_test",
     srcs = ["rls_end2end_test.cc"],
     external_deps = [
+        "absl/log:check",
         "gtest",
-        "absl/types:optional",
     ],
     flaky = True,
     tags = [
@@ -539,12 +593,15 @@ grpc_cc_test(
         "//:grpc",
         "//:grpc++",
         "//src/core:channel_args",
-        "//src/proto/grpc/lookup/v1:rls_proto",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//src/proto/grpc/testing/duplicate:echo_duplicate_proto",
-        "//test/core/util:grpc_test_util",
-        "//test/core/util:test_lb_policies",
+        "//src/proto/grpc/lookup/v1:rls_cc_grpc",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//src/proto/grpc/testing/duplicate:echo_duplicate_cc_grpc",
+        "//test/core/event_engine:event_engine_test_utils",
+        "//test/core/test_util:fake_stats_plugin",
+        "//test/core/test_util:grpc_test_util",
+        "//test/core/test_util:test_call_creds",
+        "//test/core/test_util:test_lb_policies",
         "//test/cpp/util:test_config",
         "//test/cpp/util:test_util",
     ],
@@ -554,6 +611,7 @@ grpc_cc_test(
     name = "service_config_end2end_test",
     srcs = ["service_config_end2end_test.cc"],
     external_deps = [
+        "absl/log:check",
         "gtest",
     ],
     tags = ["cpp_end2end_test"],
@@ -563,10 +621,10 @@ grpc_cc_test(
         "//:grpc",
         "//:grpc++",
         "//src/core:channel_args",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//src/proto/grpc/testing/duplicate:echo_duplicate_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//src/proto/grpc/testing/duplicate:echo_duplicate_cc_grpc",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -575,6 +633,8 @@ grpc_cc_test(
     name = "grpclb_end2end_test",
     srcs = ["grpclb_end2end_test.cc"],
     external_deps = [
+        "absl/log:check",
+        "absl/log:log",
         "gtest",
     ],
     flaky = True,  # TODO(b/150567713)
@@ -592,11 +652,12 @@ grpc_cc_test(
         "//:grpc++",
         "//:grpc_resolver_fake",
         "//src/core:channel_args",
-        "//src/proto/grpc/lb/v1:load_balancer_proto",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//src/proto/grpc/testing/duplicate:echo_duplicate_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/lb/v1:load_balancer_cc_grpc",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//src/proto/grpc/testing/duplicate:echo_duplicate_cc_grpc",
+        "//test/core/test_util:grpc_test_util",
+        "//test/core/test_util:test_call_creds",
         "//test/cpp/util:test_config",
         "//test/cpp/util:test_util",
     ],
@@ -608,17 +669,21 @@ grpc_cc_test(
     external_deps = [
         "gtest",
     ],
-    tags = ["cpp_end2end_test"],
+    tags = [
+        "cpp_end2end_test",
+        # b/117623310.
+        "grpc:no-internal-poller",
+    ],
     deps = [
         ":test_service_impl",
         "//:gpr",
         "//:grpc",
         "//:grpc++",
         "//:grpc++_reflection",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//src/proto/grpc/testing/duplicate:echo_duplicate_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//src/proto/grpc/testing/duplicate:echo_duplicate_cc_grpc",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:grpc++_proto_reflection_desc_db",
         "//test/cpp/util:test_util",
     ],
@@ -636,10 +701,10 @@ grpc_cc_test(
         "//:gpr",
         "//:grpc",
         "//:grpc++",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//src/proto/grpc/testing/duplicate:echo_duplicate_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//src/proto/grpc/testing/duplicate:echo_duplicate_cc_grpc",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -651,9 +716,11 @@ grpc_cc_test(
         ":server_crash_test_client",
     ],
     external_deps = [
+        "absl/log:check",
         "gtest",
     ],
     tags = [
+        "grpc:fails-internally",
         "no_test_android",  # android_cc_test doesn't work with data dependency.
         "no_test_ios",
         "no_windows",
@@ -662,10 +729,10 @@ grpc_cc_test(
         "//:gpr",
         "//:grpc",
         "//:grpc++",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//src/proto/grpc/testing/duplicate:echo_duplicate_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//src/proto/grpc/testing/duplicate:echo_duplicate_cc_grpc",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -676,16 +743,17 @@ grpc_cc_binary(
     srcs = ["server_crash_test_client.cc"],
     external_deps = [
         "absl/flags:flag",
+        "absl/log:check",
         "gtest",
     ],
     deps = [
         "//:gpr",
         "//:grpc",
         "//:grpc++",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//src/proto/grpc/testing/duplicate:echo_duplicate_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//src/proto/grpc/testing/duplicate:echo_duplicate_cc_grpc",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_config",
         "//test/cpp/util:test_util",
     ],
@@ -697,16 +765,18 @@ grpc_cc_test(
     external_deps = [
         "gtest",
     ],
-    tags = ["cpp_end2end_test"],
+    tags = [
+        "cpp_end2end_test",
+    ],
     deps = [
         ":interceptors_util",
         ":test_service_impl",
         "//:gpr",
         "//:grpc",
         "//:grpc++",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -719,12 +789,14 @@ grpc_cc_test(
     ],
     tags = [
         "cpp_end2end_test",
+        # TODO(b/264692543): Re-enable after fixing
+        "grpc:broken-internally",
         "no_test_ios",
         "no_windows",
     ],
     deps = [
         "//:grpcpp_server_load_reporting",
-        "//src/proto/grpc/testing:echo_proto",
+        "//src/proto/grpc/testing:echo_cc_grpc",
         "//test/cpp/util:test_util",
     ],
 )
@@ -742,15 +814,17 @@ grpc_cc_test(
         "manual",
         "exclusive",
         "no_test_ios",
+        # Needs root (not available internally).
+        "grpc:fails-internally",
     ],
     deps = [
         ":test_service_impl",
         "//:gpr",
         "//:grpc",
         "//:grpc++",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -759,6 +833,7 @@ grpc_cc_test(
     name = "shutdown_test",
     srcs = ["shutdown_test.cc"],
     external_deps = [
+        "absl/log:check",
         "gtest",
     ],
     tags = ["cpp_end2end_test"],
@@ -766,10 +841,10 @@ grpc_cc_test(
         "//:gpr",
         "//:grpc",
         "//:grpc++",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//src/proto/grpc/testing/duplicate:echo_duplicate_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//src/proto/grpc/testing/duplicate:echo_duplicate_cc_grpc",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -788,10 +863,10 @@ grpc_cc_test(
         "//:gpr",
         "//:grpc",
         "//:grpc++",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//src/proto/grpc/testing/duplicate:echo_duplicate_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//src/proto/grpc/testing/duplicate:echo_duplicate_cc_grpc",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -812,10 +887,10 @@ grpc_cc_test(
         "//:gpr",
         "//:grpc",
         "//:grpc++",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//src/proto/grpc/testing/duplicate:echo_duplicate_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//src/proto/grpc/testing/duplicate:echo_duplicate_cc_grpc",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -824,6 +899,7 @@ grpc_cc_test(
     name = "cfstream_test",
     srcs = ["cfstream_test.cc"],
     external_deps = [
+        "absl/log:check",
         "gtest",
     ],
     tags = [
@@ -834,16 +910,18 @@ grpc_cc_test(
         "exclusive",
         "no_test_android",
         "no_test_ios",
+        # Needs root (not available internally).
+        "grpc:fails-internally",
     ],
     deps = [
         ":test_service_impl",
         "//:gpr",
         "//:grpc",
         "//:grpc++",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//src/proto/grpc/testing:simple_messages_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//src/proto/grpc/testing:simple_messages_cc_proto",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -852,18 +930,23 @@ grpc_cc_test(
     name = "message_allocator_end2end_test",
     srcs = ["message_allocator_end2end_test.cc"],
     external_deps = [
+        "absl/log:check",
         "gtest",
     ],
-    tags = ["cpp_end2end_test"],
+    tags = [
+        "cpp_end2end_test",
+        # This test only works with the open source protobuf.
+        "grpc:broken-internally",
+    ],
     deps = [
         ":test_service_impl",
         "//:gpr",
         "//:grpc",
         "//:grpc++",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//src/proto/grpc/testing:simple_messages_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//src/proto/grpc/testing:simple_messages_cc_proto",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -872,6 +955,7 @@ grpc_cc_test(
     name = "context_allocator_end2end_test",
     srcs = ["context_allocator_end2end_test.cc"],
     external_deps = [
+        "absl/log:check",
         "gtest",
     ],
     tags = ["cpp_end2end_test"],
@@ -880,10 +964,10 @@ grpc_cc_test(
         "//:gpr",
         "//:grpc",
         "//:grpc++",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//src/proto/grpc/testing:simple_messages_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//src/proto/grpc/testing:simple_messages_cc_proto",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -892,6 +976,7 @@ grpc_cc_test(
     name = "port_sharing_end2end_test",
     srcs = ["port_sharing_end2end_test.cc"],
     external_deps = [
+        "absl/log:check",
         "gtest",
     ],
     tags = ["cpp_end2end_test"],
@@ -900,9 +985,9 @@ grpc_cc_test(
         "//:gpr",
         "//:grpc",
         "//:grpc++",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -918,7 +1003,7 @@ grpc_cc_test(
         "//:grpc++",
         "//:grpc++_reflection",
         "//:grpcpp_admin",
-        "//test/core/util:grpc_test_util",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -943,10 +1028,10 @@ grpc_cc_test(
         "//:grpc",
         "//:grpc++",
         "//:grpc++_authorization_provider",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//test/core/util:audit_logging_utils",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//test/core/test_util:audit_logging_utils",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -962,6 +1047,7 @@ grpc_cc_test(
         "//src/core/tsi/test_creds:server0.pem",
     ],
     external_deps = [
+        "absl/log:check",
         "gtest",
     ],
     tags = ["cpp_end2end_test"],
@@ -969,9 +1055,9 @@ grpc_cc_test(
         "//:gpr",
         "//:grpc",
         "//:grpc++",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -988,8 +1074,8 @@ grpc_cc_test(
         "//:grpcpp_backend_metric_recorder",
         "//:grpcpp_call_metric_recorder",
         "//:grpcpp_orca_service",
-        "//src/proto/grpc/testing/xds/v3:orca_service_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing/xds/v3:orca_service_cc_grpc",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -1004,10 +1090,12 @@ grpc_cc_test(
     ],
     deps = [
         "//:grpc++",
+        "//src/core:event_engine_tcp_socket_utils",
         "//src/core:experiments",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/core:grpc_fake_credentials",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -1031,9 +1119,36 @@ grpc_cc_test(
         "//:gpr",
         "//:grpc",
         "//:grpc++",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//test/core/test_util:grpc_test_util",
+        "//test/core/test_util:postmortem",
+        "//test/cpp/util:test_util",
+    ],
+)
+
+grpc_cc_test(
+    name = "tls_credentials_test",
+    srcs = ["tls_credentials_test.cc"],
+    data = [
+        "//src/core/tsi/test_creds:ca.pem",
+        "//src/core/tsi/test_creds:client.key",
+        "//src/core/tsi/test_creds:client.pem",
+        "//src/core/tsi/test_creds:server1.key",
+        "//src/core/tsi/test_creds:server1.pem",
+    ],
+    external_deps = [
+        "gtest",
+    ],
+    tags = ["tls_credentials_test"],
+    deps = [
+        ":test_service_impl",
+        "//:gpr",
+        "//:grpc",
+        "//:grpc++",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )
@@ -1050,6 +1165,7 @@ grpc_cc_test(
         "//test/core/tsi/test_creds/crl_data/crls:current.crl",
     ],
     external_deps = [
+        "absl/log:check",
         "gtest",
     ],
     tags = ["crl_provider_test"],
@@ -1058,9 +1174,9 @@ grpc_cc_test(
         "//:gpr",
         "//:grpc",
         "//:grpc++",
-        "//src/proto/grpc/testing:echo_messages_proto",
-        "//src/proto/grpc/testing:echo_proto",
-        "//test/core/util:grpc_test_util",
+        "//src/proto/grpc/testing:echo_cc_grpc",
+        "//src/proto/grpc/testing:echo_messages_cc_proto",
+        "//test/core/test_util:grpc_test_util",
         "//test/cpp/util:test_util",
     ],
 )

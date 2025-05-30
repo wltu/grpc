@@ -16,15 +16,14 @@
 
 #include "test/cpp/interop/xds_stats_watcher.h"
 
+#include <grpc/grpc.h>
+
 #include <map>
 #include <memory>
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
-
-#include <grpc/grpc.h>
-
-#include "test/core/util/test_config.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+#include "test/core/test_util/test_config.h"
 
 namespace grpc {
 namespace testing {
@@ -152,7 +151,7 @@ TEST(XdsStatsWatcherTest, WaitForRpcStatsResponseReturnsAll) {
             watcher.WaitForRpcStatsResponse(0).DebugString());
 }
 
-TEST(XdsStatsWatcherTest, WaitForRpcStatsResponseIgnoresMetadata) {
+TEST(XdsStatsWatcherTest, WaitForRpcStatsResponseExcludesMetadata) {
   XdsStatsWatcher watcher(0, 3, {});
   // RPC had metadata - but watcher should ignore it
   watcher.RpcCompleted(BuildCallResult(0), "peer1",
@@ -163,11 +162,6 @@ TEST(XdsStatsWatcherTest, WaitForRpcStatsResponseIgnoresMetadata) {
                        {{"k1", "v5"}, {"k2", "v6"}, {"k3", "v7"}});
   LoadBalancerStatsResponse expected;
   expected.mutable_rpcs_by_peer()->insert({{"peer1", 2}, {"peer2", 1}});
-  // There will still be an empty metadata collection for each RPC
-  expected.mutable_metadatas_by_peer()->insert({
-      {"peer1", BuildMetadatas({{}, {}})},
-      {"peer2", BuildMetadatas({{}})},
-  });
   (*expected.mutable_rpcs_by_method())["UnaryCall"]
       .mutable_rpcs_by_peer()
       ->insert({{"peer1", 2}, {"peer2", 1}});

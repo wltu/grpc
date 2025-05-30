@@ -20,29 +20,23 @@
 #define GRPC_SRC_CORE_EXT_TRANSPORT_CHTTP2_TRANSPORT_FLOW_CONTROL_H
 
 #include <grpc/support/port_platform.h>
-
 #include <limits.h>
 #include <stdint.h>
 
 #include <iosfwd>
+#include <optional>
 #include <string>
 #include <utility>
 
 #include "absl/functional/function_ref.h"
+#include "absl/log/check.h"
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
-
-#include <grpc/support/log.h>
-
 #include "src/core/ext/transport/chttp2/transport/http2_settings.h"
 #include "src/core/lib/debug/trace.h"
-#include "src/core/lib/gprpp/time.h"
 #include "src/core/lib/resource_quota/memory_quota.h"
 #include "src/core/lib/transport/bdp_estimator.h"
-#include "src/core/lib/transport/pid_controller.h"
-
-extern grpc_core::TraceFlag grpc_flowctl_trace;
+#include "src/core/util/time.h"
 
 namespace grpc {
 namespace testing {
@@ -134,7 +128,7 @@ class GRPC_MUST_USE_RESULT FlowControlAction {
   static const char* UrgencyString(Urgency u);
   std::string DebugString() const;
 
-  void AssertEmpty() { GPR_ASSERT(*this == FlowControlAction()); }
+  void AssertEmpty() { CHECK(*this == FlowControlAction()); }
 
   bool operator==(const FlowControlAction& other) const {
     return send_stream_update_ == other.send_stream_update_ &&
@@ -197,7 +191,7 @@ class TransportFlowControl final {
   class IncomingUpdateContext {
    public:
     explicit IncomingUpdateContext(TransportFlowControl* tfc) : tfc_(tfc) {}
-    ~IncomingUpdateContext() { GPR_ASSERT(tfc_ == nullptr); }
+    ~IncomingUpdateContext() { CHECK_EQ(tfc_, nullptr); }
 
     IncomingUpdateContext(const IncomingUpdateContext&) = delete;
     IncomingUpdateContext& operator=(const IncomingUpdateContext&) = delete;
@@ -277,6 +271,11 @@ class TransportFlowControl final {
 
   FlowControlAction SetAckedInitialWindow(uint32_t value);
 
+  void set_target_initial_window_size(uint32_t value) {
+    target_initial_window_size_ =
+        std::min(value, Http2Settings::max_initial_window_size());
+  }
+
   // Getters
   int64_t remote_window() const { return remote_window_; }
   int64_t announced_window() const { return announced_window_; }
@@ -291,11 +290,65 @@ class TransportFlowControl final {
     }
   }
 
+  // A snapshot of the flow control stats to export.
+  struct Stats {
+    int64_t target_window;
+    int64_t target_frame_size;
+    int64_t target_preferred_rx_crypto_frame_size;
+    uint32_t acked_init_window;
+    uint32_t queued_init_window;
+    uint32_t sent_init_window;
+    int64_t remote_window;
+    int64_t announced_window;
+    int64_t announced_stream_total_over_incoming_window;
+    // BDP estimator stats.
+    int64_t bdp_accumulator;
+    int64_t bdp_estimate;
+    double bdp_bw_est;
+
+    std::string ToString() const;
+    Json::Object ToJsonObject() {
+      Json::Object object;
+      object["targetWindow"] = Json::FromNumber(target_window);
+      object["targetFrameSize"] = Json::FromNumber(target_frame_size);
+      object["targetPreferredRxCryptoFrameSize"] =
+          Json::FromNumber(target_preferred_rx_crypto_frame_size);
+      object["ackedInitWindow"] = Json::FromNumber(acked_init_window);
+      object["queuedInitWindow"] = Json::FromNumber(queued_init_window);
+      object["sentInitWindow"] = Json::FromNumber(sent_init_window);
+      object["remoteWindow"] = Json::FromNumber(remote_window);
+      object["announcedWindow"] = Json::FromNumber(announced_window);
+      object["announcedStreamTotalOverIncomingWindow"] =
+          Json::FromNumber(announced_stream_total_over_incoming_window);
+      object["bdpAccumulator"] = Json::FromNumber(bdp_accumulator);
+      object["bdpEstimate"] = Json::FromNumber(bdp_estimate);
+      object["bdpBwEst"] = Json::FromNumber(bdp_bw_est);
+      return object;
+    }
+  };
+
+  Stats stats() const {
+    Stats stats;
+    stats.target_window = target_window();
+    stats.target_frame_size = target_frame_size();
+    stats.target_preferred_rx_crypto_frame_size =
+        target_preferred_rx_crypto_frame_size();
+    stats.acked_init_window = acked_init_window();
+    stats.queued_init_window = queued_init_window();
+    stats.sent_init_window = sent_init_window();
+    stats.remote_window = remote_window();
+    stats.announced_window = announced_window();
+    stats.announced_stream_total_over_incoming_window =
+        announced_stream_total_over_incoming_window();
+    stats.bdp_accumulator = bdp_estimator_.accumulator();
+    stats.bdp_estimate = bdp_estimator_.EstimateBdp();
+    stats.bdp_bw_est = bdp_estimator_.EstimateBandwidth();
+    return stats;
+  }
+
  private:
-  double TargetLogBdp();
-  double SmoothLogBdp(double value);
   double TargetInitialWindowSizeBasedOnMemoryPressureAndBdp() const;
-  static void UpdateSetting(grpc_chttp2_setting_id id, int64_t* desired_value,
+  static void UpdateSetting(absl::string_view name, int64_t* desired_value,
                             uint32_t new_desired_value,
                             FlowControlAction* action,
                             FlowControlAction& (FlowControlAction::*set)(
@@ -320,10 +373,6 @@ class TransportFlowControl final {
 
   // bdp estimation
   BdpEstimator bdp_estimator_;
-
-  // pid controller
-  PidController pid_controller_;
-  Timestamp last_pid_update_;
 
   int64_t remote_window_ = kDefaultWindow;
   int64_t target_initial_window_size_ = kDefaultWindow;
@@ -409,12 +458,31 @@ class StreamFlowControl final {
   int64_t announced_window_delta() const { return announced_window_delta_; }
   int64_t min_progress_size() const { return min_progress_size_; }
 
+  // A snapshot of the flow control stats to export.
+  struct Stats {
+    int64_t min_progress_size;
+    int64_t remote_window_delta;
+    int64_t announced_window_delta;
+    std::optional<int64_t> pending_size;
+
+    std::string ToString() const;
+  };
+
+  Stats stats() const {
+    Stats stats;
+    stats.min_progress_size = min_progress_size();
+    stats.remote_window_delta = remote_window_delta();
+    stats.announced_window_delta = announced_window_delta();
+    stats.pending_size = pending_size_;
+    return stats;
+  }
+
  private:
   TransportFlowControl* const tfc_;
   int64_t min_progress_size_ = 0;
   int64_t remote_window_delta_ = 0;
   int64_t announced_window_delta_ = 0;
-  absl::optional<int64_t> pending_size_;
+  std::optional<int64_t> pending_size_;
 
   FlowControlAction UpdateAction(FlowControlAction action);
 };

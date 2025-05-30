@@ -16,43 +16,31 @@
 
 #include <grpc/support/port_platform.h>
 
+#include <utility>
+
+#include "absl/status/status.h"
 #include "src/core/lib/debug/trace.h"
 
 #if GRPC_ARES == 1
 
+#include <ares.h>
+#include <grpc/event_engine/event_engine.h>
+
 #include <list>
 #include <memory>
 
-#include <ares.h>
-
 #include "absl/base/thread_annotations.h"
 #include "absl/container/flat_hash_map.h"
-#include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
-#include "absl/types/variant.h"
-
-#include <grpc/event_engine/event_engine.h>
-#include <grpc/support/log.h>
-
 #include "src/core/lib/event_engine/grpc_polled_fd.h"
-#include "src/core/lib/gprpp/orphanable.h"
-#include "src/core/lib/gprpp/sync.h"
+#include "src/core/lib/event_engine/ref_counted_dns_resolver_interface.h"
+#include "src/core/util/orphanable.h"
+#include "src/core/util/sync.h"
 
-namespace grpc_event_engine {
-namespace experimental {
+namespace grpc_event_engine::experimental {
 
-extern grpc_core::TraceFlag grpc_trace_ares_resolver;
-
-#define GRPC_ARES_RESOLVER_TRACE_LOG(format, ...)                              \
-  do {                                                                         \
-    if (GRPC_TRACE_FLAG_ENABLED(grpc_trace_ares_resolver)) {                   \
-      gpr_log(GPR_INFO, "(EventEngine c-ares resolver) " format, __VA_ARGS__); \
-    }                                                                          \
-  } while (0)
-
-class AresResolver : public grpc_core::InternallyRefCounted<AresResolver> {
+class AresResolver : public RefCountedDNSResolverInterface {
  public:
   static absl::StatusOr<grpc_core::OrphanablePtr<AresResolver>>
   CreateAresResolver(absl::string_view dns_server,
@@ -65,15 +53,13 @@ class AresResolver : public grpc_core::InternallyRefCounted<AresResolver> {
   ~AresResolver() override;
   void Orphan() override ABSL_LOCKS_EXCLUDED(mutex_);
 
-  void LookupHostname(absl::string_view name, absl::string_view default_port,
-                      EventEngine::DNSResolver::LookupHostnameCallback callback)
-      ABSL_LOCKS_EXCLUDED(mutex_);
-  void LookupSRV(absl::string_view name,
-                 EventEngine::DNSResolver::LookupSRVCallback callback)
-      ABSL_LOCKS_EXCLUDED(mutex_);
-  void LookupTXT(absl::string_view name,
-                 EventEngine::DNSResolver::LookupTXTCallback callback)
-      ABSL_LOCKS_EXCLUDED(mutex_);
+  void LookupHostname(EventEngine::DNSResolver::LookupHostnameCallback callback,
+                      absl::string_view name, absl::string_view default_port)
+      ABSL_LOCKS_EXCLUDED(mutex_) override;
+  void LookupSRV(EventEngine::DNSResolver::LookupSRVCallback callback,
+                 absl::string_view name) ABSL_LOCKS_EXCLUDED(mutex_) override;
+  void LookupTXT(EventEngine::DNSResolver::LookupTXTCallback callback,
+                 absl::string_view name) ABSL_LOCKS_EXCLUDED(mutex_) override;
 
  private:
   // A FdNode saves (not owns) a live socket/fd which c-ares creates, and owns a
@@ -87,8 +73,8 @@ class AresResolver : public grpc_core::InternallyRefCounted<AresResolver> {
   // close the socket (possibly through ares_destroy).
   struct FdNode {
     FdNode() = default;
-    FdNode(ares_socket_t as, GrpcPolledFd* polled_fd)
-        : as(as), polled_fd(polled_fd) {}
+    FdNode(ares_socket_t as, std::unique_ptr<GrpcPolledFd> pf)
+        : as(as), polled_fd(std::move(pf)) {}
     ares_socket_t as;
     std::unique_ptr<GrpcPolledFd> polled_fd;
     // true if the readable closure has been registered
@@ -100,9 +86,9 @@ class AresResolver : public grpc_core::InternallyRefCounted<AresResolver> {
   using FdNodeList = std::list<std::unique_ptr<FdNode>>;
 
   using CallbackType =
-      absl::variant<EventEngine::DNSResolver::LookupHostnameCallback,
-                    EventEngine::DNSResolver::LookupSRVCallback,
-                    EventEngine::DNSResolver::LookupTXTCallback>;
+      std::variant<EventEngine::DNSResolver::LookupHostnameCallback,
+                   EventEngine::DNSResolver::LookupSRVCallback,
+                   EventEngine::DNSResolver::LookupTXTCallback>;
 
   void CheckSocketsLocked() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   void MaybeStartTimerLocked() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
@@ -130,14 +116,13 @@ class AresResolver : public grpc_core::InternallyRefCounted<AresResolver> {
   FdNodeList fd_node_list_ ABSL_GUARDED_BY(mutex_);
   int id_ ABSL_GUARDED_BY(mutex_) = 0;
   absl::flat_hash_map<int, CallbackType> callback_map_ ABSL_GUARDED_BY(mutex_);
-  absl::optional<EventEngine::TaskHandle> ares_backup_poll_alarm_handle_
+  std::optional<EventEngine::TaskHandle> ares_backup_poll_alarm_handle_
       ABSL_GUARDED_BY(mutex_);
   std::unique_ptr<GrpcPolledFdFactory> polled_fd_factory_;
   std::shared_ptr<EventEngine> event_engine_;
 };
 
-}  // namespace experimental
-}  // namespace grpc_event_engine
+}  // namespace grpc_event_engine::experimental
 
 // Exposed in this header for C-core tests only
 extern void (*event_engine_grpc_ares_test_only_inject_config)(
@@ -147,4 +132,9 @@ extern void (*event_engine_grpc_ares_test_only_inject_config)(
 extern bool g_event_engine_grpc_ares_test_only_force_tcp;
 
 #endif  // GRPC_ARES == 1
+
+bool ShouldUseAresDnsResolver();
+absl::Status AresInit();
+void AresShutdown();
+
 #endif  // GRPC_SRC_CORE_LIB_EVENT_ENGINE_ARES_RESOLVER_H
